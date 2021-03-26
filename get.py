@@ -14,14 +14,14 @@ headers = {
     'Referer': 'https://www.bilibili.com/'
 }
 
-def n_get_reply_raw(oid, type_, pn, root=None, sort=0):       # 获取原始评论区
+def n_get_reply_raw(oid, type_, pn, root=None, sort=0, printfunc=print):       # 获取原始评论区
     url_start = 'https://api.bilibili.com/x/v2/reply'
     if isinstance(root, int):                               # 指定楼中楼
         url_start += '/reply'                               # 要爬取楼中楼
     elif root is None:                                      #
         pass                                                # 要爬取主楼
     else:                                                   #
-        raise BaseException('### root属性不正确!')           #
+        printfunc('### root属性不正确!')           #
 
     resp = req.get(url_start,
                    params={'oid':oid, 'root':root, 'pn':pn, 'type':type_, 'sort':sort},
@@ -32,7 +32,7 @@ def n_get_reply_raw(oid, type_, pn, root=None, sort=0):       # 获取原始评�
     else:                                                   # 状态正常
         return {'status':resp.status_code, 'content':json.loads(resp.text)}
 
-def n_get_reply_main(oid, oidtype=11, root=None):
+def n_get_reply_main(oid, oidtype=11, root=None, printfunc=print):
     page_max = 1            # 最大页码
     count = 1               # 当前页码
     reply_container = []    # 存放评论区的列表
@@ -43,8 +43,8 @@ def n_get_reply_main(oid, oidtype=11, root=None):
 
         if response['status'] != 200:               # 一般是412了, 一小时后解封
             sleeptime = random.random() * 120       # 随机休眠
-            print(f'### 状态异常, 错误代码为{response["status"]};')
-            print(f'### 当前页码为{count}, 程序休眠{sleeptime}秒后继续;')
+            printfunc(f'### 状态异常, 错误代码为{response["status"]};')
+            printfunc(f'### 当前页码为{count}, 程序休眠{sleeptime}秒后继续;')
             sleep(sleeptime)
             continue
 
@@ -106,7 +106,7 @@ def n_get_reply_main(oid, oidtype=11, root=None):
 
     return reply_container
 
-def n_get_dynamic_repost_raw(dynamic_id):                   # 此处逻辑感谢 @疯狂小瑞瑞
+def n_get_dynamic_repost_raw(dynamic_id, printfunc=print):                   # 此处逻辑感谢 @疯狂小瑞瑞
     has_more = 1
     offset = ''
     url_start = f'https://api.vc.bilibili.com/dynamic_repost/v1/dynamic_repost/repost_detail?dynamic_id={dynamic_id}'
@@ -118,8 +118,8 @@ def n_get_dynamic_repost_raw(dynamic_id):                   # 此处逻辑感谢
 
         if resp.status_code != 200:               # 一般是412了, 一小时后解封
             sleeptime = random.random() * 120       # 随机休眠
-            print(f'### 状态异常, 错误代码为{resp.status_code};')
-            print(f'### 当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
+            printfunc(f'### 状态异常, 错误代码为{resp.status_code};')
+            printfunc(f'### 当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
             sleep(sleeptime)
             continue
 
@@ -132,30 +132,31 @@ def n_get_dynamic_repost_raw(dynamic_id):                   # 此处逻辑感谢
 
     return reposts
 
-def n_get_dynamic_repost_main(dynamic_id):
-    reposts = n_get_dynamic_repost_raw(dynamic_id=dynamic_id) # 获取转发列表
+def n_get_dynamic_repost_main(dynamic_id, printfunc=print):
+    reposts = n_get_dynamic_repost_raw(dynamic_id=dynamic_id, printfunc=printfunc) # 获取转发列表
     repost_container = []                                   # 用于存储提取后的转发信息
 
     for j in reposts:
         if j['code'] == 0:
-            for i in j['data']['items']:
-                true_repost = {
-                    'rid':i['desc']['rid'],                                             # 转发编号, 是一个非常大的整数
-                    'uname':i['desc']['user_profile']['info']['uname'],                 # 用户名
-                    'mid':str(i['desc']['user_profile']['info']['uid']),                # 用户id
-                    'level':i['desc']['user_profile']['level_info']['current_level'],   # 用户等级
-                    'content':json.loads(i['card'])['item']['content'],                 # 转发内容
-                    'avatar':i['desc']['user_profile']['info']['avatar'],               # 头像
-                    'rtimestamp':i['desc']['timestamp'],                                # 转发时间
-                    'type':'repost'
-                }
-                repost_container.append(true_repost)
+            if 'items' in j['data'].keys():
+                for i in j['data']['items']:
+                    true_repost = {
+                        'rid':i['desc']['rid'],                                             # 转发编号, 是一个非常大的整数
+                        'uname':i['desc']['user_profile']['info']['uname'],                 # 用户名
+                        'mid':str(i['desc']['user_profile']['info']['uid']),                # 用户id
+                        'level':i['desc']['user_profile']['level_info']['current_level'],   # 用户等级
+                        'content':json.loads(i['card'])['item']['content'],                 # 转发内容
+                        'avatar':i['desc']['user_profile']['info']['face'],                 # 头像
+                        'rtimestamp':i['desc']['timestamp'],                                # 转发时间
+                        'type':'repost'
+                    }
+                    repost_container.append(true_repost)
         else:
-            print('### 有失败请求。')
+            printfunc('### 有失败请求。')
 
     return repost_container
 
-def n_get_dynamic_like_raw(dynamic_id):
+def n_get_dynamic_like_raw(dynamic_id, printfunc=print):
     url_start = 'http://api.vc.bilibili.com/dynamic_like/v1/dynamic_like/spec_item_likes'
     likes = []
     count = 0
@@ -172,15 +173,15 @@ def n_get_dynamic_like_raw(dynamic_id):
 
         if resp.status_code != 200:               # 一般是412了, 一小时后解封
             sleeptime = random.random() * 120       # 随机休眠
-            print(f'### 状态异常, 错误代码为{resp.status_code};')
-            print(f'### 当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
+            printfunc(f'### 状态异常, 错误代码为{resp.status_code};')
+            printfunc(f'### 当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
             sleep(sleeptime)
             continue
 
         content = json.loads(resp.text)
         data = content['data']
         if content['code'] != 0:
-            print('### 数据有误。')
+            printfunc('### 数据有误。')
             return
         
         countmax = data['total_count']
@@ -194,7 +195,7 @@ def n_get_dynamic_like_raw(dynamic_id):
 
     return likes
 
-def n_get_dynamic_like_main(dynamic_id):
+def n_get_dynamic_like_main(dynamic_id, printfunc=print):
     likes = n_get_dynamic_like_raw(dynamic_id=dynamic_id) # 获取点赞列表
     likes_container = []                                  # 用于存储提取后的点赞信息
 
@@ -212,6 +213,23 @@ def n_get_dynamic_like_main(dynamic_id):
         likes_container.append(true_like)
 
     return likes_container
+
+def n_get_dynamic_detail_main(dynamic_id, printfunc=print):
+    url = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail'
+    resp = req.get(url, params={'dynamic_id':dynamic_id})
+    if resp.status_code != 200:               # 一般是412了, 一小时后解封
+        printfunc(f'### 状态异常, 错误代码为{resp.status_code};')
+        return {}
+    else:
+        content = json.loads(resp.text)
+        data = content['data']
+        try:
+            result = {
+                'rid':data['card']['desc']['rid']
+            }
+            return result
+        except:
+            return {}
 
 '''
 def n_filter(reply_container):                          # 包括将评论/转发按时间排序和去除单一用户的重复评论/转发
