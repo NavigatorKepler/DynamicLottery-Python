@@ -21,7 +21,7 @@ def n_get_reply_raw(oid, type_, pn, root=None, sort=0, printfunc=print):       #
     elif root is None:                                      #
         pass                                                # 要爬取主楼
     else:                                                   #
-        printfunc('### root属性不正确!')           #
+        printfunc(f'[{int(time())}]root属性不正确!')           #
 
     resp = req.get(url_start,
                    params={'oid':oid, 'root':root, 'pn':pn, 'type':type_, 'sort':sort},
@@ -43,13 +43,18 @@ def n_get_reply_main(oid, oidtype=11, root=None, printfunc=print):
 
         if response['status'] != 200:               # 一般是412了, 一小时后解封
             sleeptime = random.random() * 120       # 随机休眠
-            printfunc(f'### 状态异常, 错误代码为{response["status"]};')
-            printfunc(f'### 当前页码为{count}, 程序休眠{sleeptime}秒后继续;')
+            printfunc(f'[{int(time())}]状态异常, 错误代码为{response["status"]};')
+            printfunc(f'[{int(time())}]当前页码为{count}, 程序休眠{sleeptime}秒后继续;')
             sleep(sleeptime)
             continue
 
         else:
             pre_content = response['content']
+            # print(pre_content)
+            if 'data' not in pre_content.keys():
+                printfunc(f'[{int(time())}]获取回复失败, 可能是因为此动态没有除UP主的评论以外的评论。')
+                return []
+
             data = pre_content['data']
 
             # current_page = data['page']['num']
@@ -118,8 +123,8 @@ def n_get_dynamic_repost_raw(dynamic_id, printfunc=print):                   # �
 
         if resp.status_code != 200:               # 一般是412了, 一小时后解封
             sleeptime = random.random() * 120       # 随机休眠
-            printfunc(f'### 状态异常, 错误代码为{resp.status_code};')
-            printfunc(f'### 当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
+            printfunc(f'[{int(time())}]状态异常, 错误代码为{resp.status_code};')
+            printfunc(f'[{int(time())}]当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
             sleep(sleeptime)
             continue
 
@@ -152,7 +157,7 @@ def n_get_dynamic_repost_main(dynamic_id, printfunc=print):
                     }
                     repost_container.append(true_repost)
         else:
-            printfunc('### 有失败请求。')
+            printfunc(f'[{int(time())}]获取转发内容时有失败请求。获取不完整。')
 
     return repost_container
 
@@ -173,16 +178,16 @@ def n_get_dynamic_like_raw(dynamic_id, printfunc=print):
 
         if resp.status_code != 200:               # 一般是412了, 一小时后解封
             sleeptime = random.random() * 120       # 随机休眠
-            printfunc(f'### 状态异常, 错误代码为{resp.status_code};')
-            printfunc(f'### 当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
+            printfunc(f'[{int(time())}]状态异常, 错误代码为{resp.status_code};')
+            printfunc(f'[{int(time())}]当前正在获取{dynamic_id}, 程序休眠{sleeptime}秒后继续;')
             sleep(sleeptime)
             continue
 
         content = json.loads(resp.text)
         data = content['data']
         if content['code'] != 0:
-            printfunc('### 数据有误。')
-            return
+            printfunc(f'[{int(time())}]点赞数据有误。')
+            return []
         
         countmax = data['total_count']
         pagemax = countmax / 20.0
@@ -196,7 +201,7 @@ def n_get_dynamic_like_raw(dynamic_id, printfunc=print):
     return likes
 
 def n_get_dynamic_like_main(dynamic_id, printfunc=print):
-    likes = n_get_dynamic_like_raw(dynamic_id=dynamic_id) # 获取点赞列表
+    likes = n_get_dynamic_like_raw(dynamic_id=dynamic_id, printfunc=printfunc) # 获取点赞列表
     likes_container = []                                  # 用于存储提取后的点赞信息
 
     for i in likes:
@@ -214,22 +219,55 @@ def n_get_dynamic_like_main(dynamic_id, printfunc=print):
 
     return likes_container
 
-def n_get_dynamic_detail_main(dynamic_id, printfunc=print):
+def n_get_dynamic_detail_main(unknowid, printfunc=print):
     url = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail'
-    resp = req.get(url, params={'dynamic_id':dynamic_id})
+    
+    # 动态分至少两种, 直接给出评论区rid或给出动态id
+    # 需要手动尝试
+    # 第一轮, dynamic_id
+    resp = req.get(url, params={'dynamic_id':unknowid})
     if resp.status_code != 200:               # 一般是412了, 一小时后解封
-        printfunc(f'### 状态异常, 错误代码为{resp.status_code};')
+        printfunc(f'[{int(time())}]获取动态信息时状态异常, 错误代码为{resp.status_code};')
         return {}
-    else:
-        content = json.loads(resp.text)
-        data = content['data']
-        try:
-            result = {
-                'rid':data['card']['desc']['rid']
-            }
-            return result
-        except:
+    content = json.loads(resp.text)
+
+    # 第二轮, rid
+    if 'card' not in content['data'].keys():
+        resp = req.get(url, params={'rid':unknowid, 'type':2})
+        if resp.status_code != 200:               # 一般是412了, 一小时后解封
+            printfunc(f'[{int(time())}]获取动态信息时状态异常, 错误代码为{resp.status_code};')
             return {}
+    content = json.loads(resp.text)
+
+    # 如果有第三轮
+
+    # 都不对
+    if 'card' not in content['data'].keys():
+        printfunc(f'[{int(time())}]获取动态详细信息不正常, 出现此情况的原因可能是: \n1 - 输入了一个非法的ID\n2 - 输入了一个不属于动态的评论区ID')
+        return {}
+
+    data = content['data']
+    dynamic_struct = json.loads(data['card']['card'])
+    result = {
+        'uid':data['card']['desc']['user_profile']['info']['uid'],
+        'uname':data['card']['desc']['user_profile']['info']['uname'],
+        'view':data['card']['desc']['view'],
+        'repost':data['card']['desc']['repost'],
+        'comment':data['card']['desc']['comment'],
+        'like':data['card']['desc']['like'],
+        'content':dynamic_struct['item']['description'] if 'description' in dynamic_struct['item'].keys()
+                    else dynamic_struct['item']['content'] if 'content' in dynamic_struct['item'].keys()
+                    else '<内容获取失败>',
+        'rid':data['card']['desc']['rid'],
+        'dynamic_id':data['card']['desc']['dynamic_id'],
+        # 'type':11
+        'type':17 if data['card']['desc']['type'] == 1
+                else 11 if data['card']['desc']['type'] == 2
+                else 11
+        #        type:1 -> type:17
+        #    此处type:2 -> 评论区type:11
+    }
+    return result
 
 '''
 def n_filter(reply_container):                          # 包括将评论/转发按时间排序和去除单一用户的重复评论/转发

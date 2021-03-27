@@ -79,7 +79,7 @@ class Ui_MainWindow(object):
         self.SpinMaxFans.setObjectName("SpinMaxFans")
         self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
         self.progressBar.setGeometry(QtCore.QRect(10, 110, 351, 23))
-        self.progressBar.setProperty("value", 24)
+        self.progressBar.setProperty("value", 0)
         self.progressBar.setTextVisible(False)
         self.progressBar.setObjectName("progressBar")
         self.HintPersonCount = QtWidgets.QLabel(self.centralwidget)
